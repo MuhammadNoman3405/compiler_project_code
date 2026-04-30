@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analysis Results | W++ Token Analyzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #080b14;
+  --s1:      #0d1120;
+  --s2:      #111828;
+  --card:    #151d2e;
+  --border:  #1e2a42;
+  --border2: #263450;
+  --text:    #cdd6f4;
+  --muted:   #6c7a96;
+  --accent:  #89b4fa;
+  --green:   #a6e3a1;
+  --yellow:  #f9e2af;
+  --red:     #f38ba8;
+  --mauve:   #cba6f7;
+  --peach:   #fab387;
+  --sky:     #89dceb;
+  --teal:    #94e2d5;
+  
+  /* token colors */
+  --kw:   #cba6f7; /* Keywords */
+  --id:   #89dceb; /* Identifiers */
+  --con:  #fab387; /* Constants (Numbers) */
+  --lit:  #f9e2af; /* Literals (Strings/Chars) */
+  --op:   #89b4fa; /* Operators */
+  --pun:  #a6e3a1; /* Punctuators */
+  --spec: #f38ba8; /* Special Characters */
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Syne', sans-serif;
+  min-height: 100vh;
+  padding-bottom: 60px;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(137,180,250,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(137,180,250,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  padding: 18px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  background: rgba(8,11,20,0.9);
+  backdrop-filter: blur(12px);
+}
+
+.logo-area { display: flex; align-items: center; gap: 14px; text-decoration: none; color: inherit; }
+.logo-icon {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, #89b4fa, #cba6f7);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+}
+.logo-text h1 { font-size: 1.15rem; font-weight: 800; color: #fff; }
+
+.header-actions { display: flex; gap: 12px; }
+
+.btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: .85rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Syne', sans-serif;
+  transition: all .2s;
+  border: none;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border2); }
+.btn-outline:hover { background: rgba(255,255,255,0.05); }
+
+.btn-primary { background: var(--accent); color: #080b14; }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(137,180,250,0.3); }
+
+.container {
+  max-width: 1200px;
+  margin: 40px auto;
+  padding: 0 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 24px;
+}
+
+/* ═══════════ SECTION CARDS ═══════════ */
+.section-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.section-header {
+  padding: 20px 24px;
+  background: var(--s1);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-title {
+  font-size: .8rem;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .15em;
+  font-family: 'JetBrains Mono', monospace;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.section-title::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+.refresh-link {
+  font-size: .7rem;
+  color: var(--accent);
+  text-decoration: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background .2s;
+}
+
+.refresh-link:hover { background: rgba(137,180,250,0.1); }
+
+.section-body {
+  padding: 24px;
+  flex: 1;
+}
+
+/* ═══════════ TABLES ═══════════ */
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .8rem;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+th {
+  background: rgba(255,255,255,0.02);
+  text-align: left;
+  padding: 12px 16px;
+  color: var(--muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+}
+
+td {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+
+tr:last-child td { border-bottom: none; }
+
+.pill {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: .7rem;
+  font-weight: 700;
+}
+
+.stat-val { font-size: 1.5rem; font-weight: 800; color: var(--accent); margin-bottom: 4px; }
+.stat-lbl { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+
+.summary-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.stat-item {
+  background: rgba(255,255,255,0.03);
+  padding: 16px;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.stream-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.token-chip {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: .75rem;
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.section-card { animation: fadeInUp 0.6s ease forwards; opacity: 0; }
+.section-card:nth-child(1) { animation-delay: 0.1s; }
+.section-card:nth-child(2) { animation-delay: 0.2s; }
+.section-card:nth-child(3) { animation-delay: 0.3s; }
+.section-card:nth-child(4) { animation-delay: 0.4s; }
+.section-card:nth-child(5) { animation-delay: 0.5s; }
+.section-card:nth-child(6) { animation-delay: 0.6s; }
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-area">
+    <div class="logo-icon">⚙</div>
+    <div class="logo-text">
+      <h1>Analysis Report</h1>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-outline" onclick="window.print()">Print PDF</button>
+    <a href="Analyze.html" class="btn btn-primary">Change Input File</a>
+  </div>
+</header>
+
+<div class="container">
+  <div class="results-grid" id="resultsGrid">
+    <!-- Results will be injected here -->
+  </div>
+</div>
+
+<div class="loading-overlay" id="fullLoader">
+  <div style="font-size: 2rem; margin-bottom: 1rem;">⚙</div>
+  <p style="font-family: 'JetBrains Mono', monospace; letter-spacing: .2em;">GENERATING REPORT...</p>
+</div>
+
+<script>
+const API_BASE_URL = 'https://cc-scanner-backend.onrender.com';
+
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    const resultData = localStorage.getItem('analysisResult');
+    if (!resultData) {
+      window.location.href = 'Analyze.html';
+      return;
+    }
+    
+    renderReport(JSON.parse(resultData));
+  } catch (err) {
+    console.error('Report Rendering Error:', err);
+    alert('Failed to render report: ' + err.message);
+  } finally {
+    setTimeout(() => {
+      document.getElementById('fullLoader').style.display = 'none';
+    }, 800);
+  }
+});
+
+async function refreshSection() {
+  const code = localStorage.getItem('sourceCode');
+  if (!code) return;
+  
+  document.getElementById('fullLoader').style.display = 'flex';
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/analyze/code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code, filename: 'input.wpp' })
+    });
+    const data = await response.json();
+    localStorage.setItem('analysisResult', JSON.stringify(data));
+    renderReport(data);
+  } catch (e) {
+    alert('Refresh failed: ' + e.message);
+  } finally {
+    document.getElementById('fullLoader').style.display = 'none';
+  }
+}
+
+function renderReport(data) {
+  try {
+    const grid = document.getElementById('resultsGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+  
+  // 1. Overview Section
+  const overview = createSection('Overall Statistics', `
+    <div class="summary-stats">
+      <div class="stat-item"><div class="stat-val">${data.total_tokens || 0}</div><div class="stat-lbl">Total Tokens</div></div>
+      <div class="stat-item"><div class="stat-val">${data.total_lines || 0}</div><div class="stat-lbl">Total Lines</div></div>
+      <div class="stat-item"><div class="stat-val">${data.lines_with_code || 0}</div><div class="stat-lbl">Code Lines</div></div>
+      <div class="stat-item"><div class="stat-val">${data.empty_lines || 0}</div><div class="stat-lbl">Empty Lines</div></div>
+    </div>
+  `);
+  grid.appendChild(overview);
+
+  // 2. Token Categories
+  const categories = createCategoryTable(data);
+  grid.appendChild(createSection('Category Breakdown', categories));
+
+  // 3. Keywords
+  if (data.keywords && data.keywords.counts && Object.keys(data.keywords.counts).length > 0) {
+    grid.appendChild(createSection('Keywords Detected', createTable(data.keywords, 'Keyword', 'kw')));
+  }
+
+  // 4. Identifiers
+  if (data.identifiers && data.identifiers.counts && Object.keys(data.identifiers.counts).length > 0) {
+    grid.appendChild(createSection('Identifiers', createTable(data.identifiers, 'Identifier', 'id')));
+  }
+
+  // 5. Operators
+  if (data.operators && data.operators.counts && Object.keys(data.operators.counts).length > 0) {
+    grid.appendChild(createSection('Operators', createTable(data.operators, 'Operator', 'op')));
+  }
+
+  // 6. Punctuators
+  if (data.punctuators && data.punctuators.counts && Object.keys(data.punctuators.counts).length > 0) {
+    grid.appendChild(createSection('Punctuators', createTable(data.punctuators, 'Punctuator', 'pun')));
+  }
+
+  // 7. Constants
+  if (data.constants) {
+    const constData = {
+      counts: { ...(data.constants?.integers?.counts || {}), ...(data.constants?.floats?.counts || {}) },
+      tokens: { ...(data.constants?.integers?.tokens || {}), ...(data.constants?.floats?.tokens || {}) }
+    };
+    if (Object.keys(constData.counts).length > 0) {
+      grid.appendChild(createSection('Constants (Numeric)', createTable(constData, 'Constant', 'con')));
+    }
+  }
+
+  // 8. Literals
+  if (data.literals) {
+    const litData = {
+      counts: { ...(data.literals?.strings?.counts || {}), ...(data.literals?.chars?.counts || {}) },
+      tokens: { ...(data.literals?.strings?.tokens || {}), ...(data.literals?.chars?.tokens || {}) }
+    };
+    if (Object.keys(litData.counts).length > 0) {
+      grid.appendChild(createSection('Literals (Textual)', createTable(litData, 'Literal', 'lit')));
+    }
+  }
+
+  // 9. Special Characters
+  if (data.special_characters && data.special_characters.counts && Object.keys(data.special_characters.counts).length > 0) {
+    grid.appendChild(createSection('Special Characters', createTable(data.special_characters, 'Character', 'spec')));
+  }
+  
+  // 10. Token Stream
+  if (data.allTokens && data.allTokens.length > 0) {
+    grid.appendChild(createSection('Token Stream', createTokenStream(data.allTokens), true));
+  } else {
+    const stream = generateFallbackStream(data);
+    grid.appendChild(createSection('Token Stream', createTokenStream(stream), true));
+  }
+} catch (e) {
+  console.error('Error in renderReport:', e);
+  throw e;
+}
+}
+
+function generateFallbackStream(data) {
+  const stream = [];
+  const add = (dict, cat, col) => {
+    if (!dict || !dict.tokens) return;
+    for (const [name, lines] of Object.entries(dict.tokens)) {
+      lines.forEach(l => stream.push({ value: name, category: cat, line: l, color: col }));
+    }
+  };
+  add(data.keywords, 'KEYWORD', 'kw');
+  add(data.identifiers, 'IDENTIFIER', 'id');
+  add(data.operators, 'OPERATOR', 'op');
+  add(data.punctuators, 'PUNCTUATOR', 'pun');
+  add(data.special_characters, 'SPECIAL', 'spec');
+  
+  if (data.constants) {
+    add(data.constants.integers, 'CONSTANT', 'con');
+    add(data.constants.floats, 'CONSTANT', 'con');
+  }
+  if (data.literals) {
+    add(data.literals.strings, 'LITERAL', 'lit');
+    add(data.literals.chars, 'LITERAL', 'lit');
+  }
+  
+  return stream.sort((a,b) => a.line - b.line);
+}
+
+function createTokenStream(tokens) {
+  let chips = tokens.map(t => `
+    <span class="token-chip" style="border-left: 3px solid var(--${t.color || getColor(t.category)})" title="Line ${t.line}">
+      ${t.value}
+    </span>
+  `).join('');
+  return `<div class="stream-wrap">${chips}</div>`;
+}
+
+function getColor(cat) {
+  return { 
+    KEYWORD: 'kw', 
+    IDENTIFIER: 'id', 
+    OPERATOR: 'op', 
+    PUNCTUATOR: 'pun', 
+    CONSTANT: 'con', 
+    LITERAL: 'lit', 
+    SPECIAL: 'spec' 
+  }[cat] || 'muted';
+}
+
+function createSection(title, content, fullWidth = false) {
+  const card = document.createElement('div');
+  card.className = 'section-card';
+  if (fullWidth) card.style.gridColumn = '1 / -1';
+  card.innerHTML = `
+    <div class="section-header">
+      <h2 class="section-title">${title}</h2>
+      <a href="#" class="refresh-link" onclick="refreshSection(); return false;">↻ Refresh</a>
+    </div>
+    <div class="section-body">
+      ${content}
+    </div>
+  `;
+  return card;
+}
+
+function createTable(dict, label, colorVar) {
+  let rows = '';
+  for (const [name, count] of Object.entries(dict.counts)) {
+    const lines = dict.tokens[name].join(', ');
+    rows += `
+      <tr>
+        <td style="color:var(--${colorVar})">${name}</td>
+        <td>${count}</td>
+        <td style="color:var(--muted); font-size: .7rem;">${lines}</td>
+      </tr>
+    `;
+  }
+  return `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>${label}</th><th>Qty</th><th>Lines</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function createCategoryTable(data) {
+  const sumConst = data.constants ? (sum(data.constants.integers?.counts) + sum(data.constants.floats?.counts)) : 0;
+  const sumLit = data.literals ? (sum(data.literals.strings?.counts) + sum(data.literals.chars?.counts)) : 0;
+  
+  const cats = [
+    { name: 'Keywords', val: sum(data.keywords?.counts), col: 'kw' },
+    { name: 'Identifiers', val: sum(data.identifiers?.counts), col: 'id' },
+    { name: 'Operators', val: sum(data.operators?.counts), col: 'op' },
+    { name: 'Punctuators', val: sum(data.punctuators?.counts), col: 'pun' },
+    { name: 'Constants', val: sumConst, col: 'con' },
+    { name: 'Literals', val: sumLit, col: 'lit' },
+    { name: 'Special Chars', val: sum(data.special_characters?.counts), col: 'spec' }
+  ];
+  
+  let rows = cats.map(c => `
+    <tr>
+      <td><span class="pill" style="background:var(--${c.col}); color:#000">${c.name}</span></td>
+      <td><strong>${c.val}</strong></td>
+      <td>${data.total_tokens > 0 ? ((c.val / data.total_tokens) * 100).toFixed(1) : 0}%</td>
+    </tr>
+  `).join('');
+  
+  return `<div class="table-wrap"><table><thead><tr><th>Category</th><th>Count</th><th>%</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function createLiteralTable(literals) {
+  let rows = '';
+  const types = ['strings', 'integers', 'floats', 'chars'];
+  types.forEach(type => {
+    for (const [val, count] of Object.entries(literals[type].counts)) {
+      rows += `<tr><td>${val}</td><td><small>${type.toUpperCase()}</small></td><td>${count}</td></tr>`;
+    }
+  });
+  if (!rows) return null;
+  return `<div class="table-wrap"><table><thead><tr><th>Value</th><th>Type</th><th>Qty</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function sum(obj) { 
+  if (!obj) return 0;
+  return Object.values(obj).reduce((a, b) => a + b, 0); 
+}
+function sumLiterals(l) {
+  if (!l) return 0;
+  return sum(l.strings?.counts) + sum(l.integers?.counts) + sum(l.floats?.counts) + sum(l.chars?.counts);
+}
+</script>
+
+</body>
+</html>

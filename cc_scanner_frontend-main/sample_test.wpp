@@ -1,0 +1,86 @@
+// W++ Token Analyzer Test Program
+// This program demonstrates all token types
+// CS-310 Compiler Construction - Spring 2K26
+
+int main() {
+
+    // Variable declarations
+    int age = 25;
+    float temperature = 36.6;
+    double pi = 3.14159265359;
+    char grade = 'A';
+    string name = "John Doe";
+
+    // Multiple declarations on one line
+    int x = 10, y = 20, z = 30;
+    float a = 1.5, b = 2.5, c = 3.5;
+
+    // Arithmetic operations
+    int sum = x + y + z;
+    float product = a * b;
+    int remainder = 100 % 7;
+    double division = pi / 2.0;
+
+    // Conditional logic
+    if (age >= 18 && age <= 60) {
+        print "Adult age range";
+        string status = "Working";
+    } else {
+        print "Not in range";
+        string status = "Other";
+    }
+
+    // Nested if-else
+    if (x > y) {
+        print "x is greater";
+    } else if (y > z) {
+        print "y is greater";
+    } else {
+        print "z is greatest";
+    }
+
+    // While loop
+    int counter = 0;
+    while (counter < 10) {
+        counter = counter + 1;
+        print "Counter value: ";
+        print counter;
+    }
+
+    // For loop
+    for (int i = 0; i < 5; i = i + 1) {
+        print "Iteration: ";
+        print i;
+    }
+
+    // Boolean and logical operations
+    bool flag = true;
+    bool result = (x > y) || (a < b);
+
+    // Character operations
+    char newline = '\n';
+    char tab = '\t';
+
+    // String operations
+    string greeting = "Hello World";
+    string lang = "W++";
+
+    // Comparison operators demo
+    int p = 100;
+    int q = 200;
+    bool eq  = (p == q);
+    bool neq = (p != q);
+    bool lt  = (p < q);
+    bool gt  = (p > q);
+    bool lte = (p <= q);
+    bool gte = (p >= q);
+
+    /* Multi-line comment:
+       This section tests all
+       separator types */
+
+    read age;
+    read name;
+
+    return 0;
+}

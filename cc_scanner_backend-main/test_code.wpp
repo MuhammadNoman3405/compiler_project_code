@@ -1,0 +1,19 @@
+// W++ Test Program
+int x = 10;
+float pi = 3.14;
+char grade = 'A';
+string name = "Alice";
+int result = x + 5;
+
+if (x >= 10 && x <= 100) {
+    print "In range";
+} else {
+    print "Out of range";
+}
+
+int counter = 0;
+while (counter < 5) {
+    counter = counter + 1;
+}
+
+return 0;

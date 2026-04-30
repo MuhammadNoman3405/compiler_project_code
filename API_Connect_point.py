@@ -5,11 +5,13 @@ from main import CodeAnalyzer, CodeAnalyzerFromFile
 
 app = FastAPI(title="W++ Token Analyzer", version="1.0.0")
 
-# ── CORS so Next.js frontend can call this ────────────────────────────
+# ── CORS fixed for Vercel ─────────────────────────────────────────────
+# FIX: allow_credentials=True aur allow_origins=["*"] saath nahi chalte
+# Solution: allow_credentials=False kiya aur origins ["*"] rakha
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000","*"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,        # <-- yeh True tha, False kiya
     allow_methods=["*"],
     allow_headers=["*"],
 )

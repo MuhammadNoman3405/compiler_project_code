@@ -61,24 +61,17 @@ OPERATOR_MAP = {
 }
 
 PUNCTUATOR_MAP = {
-    ";": "PUNCTUATOR_SEMICOLON",
-    ",": "PUNCTUATOR_COMMA",
-    "(": "PUNCTUATOR_LPAREN",
-    ")": "PUNCTUATOR_RPAREN",
-    "{": "PUNCTUATOR_LBRACE",
-    "}": "PUNCTUATOR_RBRACE",
-    "[": "PUNCTUATOR_LBRACKET",
-    "]": "PUNCTUATOR_RBRACKET",
+    ";": "SEPARATOR_SEMICOLON",
+    ",": "SEPARATOR_COMMA",
+    "(": "SEPARATOR_LPAREN",
+    ")": "SEPARATOR_RPAREN",
+    "{": "SEPARATOR_LBRACE",
+    "}": "SEPARATOR_RBRACE",
+    "[": "SEPARATOR_LBRACKET",
+    "]": "SEPARATOR_RBRACKET",
 }
 
-SPECIAL_CHAR_MAP = {
-    "#": "SPECIAL_PREPROCESSOR",
-    "$": "SPECIAL_DOLLAR",
-    "@": "SPECIAL_AT",
-    ":": "SPECIAL_COLON",
-    "?": "SPECIAL_QUESTION",
-    ".": "SPECIAL_DOT",
-}
+
 
 # ─────────────────────────────────────────────────────────────────
 # BUG 1 FIX: "class User:" was completely missing in original file!
@@ -150,8 +143,6 @@ class User:
         operators_number = {}
         tokenized_Punctuators = {}
         punctuators_number = {}
-        tokenized_SpecialChars = {}
-        special_chars_number = {}
 
         for line, line_number in cleaned_lines:
             i = 0
@@ -187,33 +178,18 @@ class User:
                     operators_number[op_name] = operators_number.get(op_name, 0) + 1
                     i += 1
 
-                # punctuator
+                # punctuator (separator)
                 elif line[i] in PUNCTUATOR_MAP:
                     pun_name = PUNCTUATOR_MAP[line[i]]
                     tokenized_Punctuators.setdefault(pun_name, []).append(line_number)
                     punctuators_number[pun_name] = punctuators_number.get(pun_name, 0) + 1
                     i += 1
 
-                # special char
-                elif line[i] in SPECIAL_CHAR_MAP:
-                    # don't treat '.' as special if it's part of a float number
-                    if line[i] == '.' and (
-                        (i > 0 and line[i-1].isdigit()) or
-                        (i < len(line)-1 and line[i+1].isdigit())
-                    ):
-                        i += 1
-                        continue
-                    spec_name = SPECIAL_CHAR_MAP[line[i]]
-                    tokenized_SpecialChars.setdefault(spec_name, []).append(line_number)
-                    special_chars_number[spec_name] = special_chars_number.get(spec_name, 0) + 1
-                    i += 1
-
                 else:
                     i += 1
 
         return (tokenized_operators, operators_number,
-                tokenized_Punctuators, punctuators_number,
-                tokenized_SpecialChars, special_chars_number)
+                tokenized_Punctuators, punctuators_number)
 
     # ── tokenizing_keywords ─────────────────────────────────────────
     # BUG 2 FIX: strip string was  ';,(){}[]<>!=+-*/%&|#$@:?'
@@ -435,10 +411,8 @@ def CodeAnalyzer(source_code: str, file_name: str = "snippet.wpp"):
     result, total_tokens = user.tokenize(data)
     comments, multi_line_comment, cleaned_lines = user.line_tokenizer(result)
 
-    # 1. Operators, Punctuators, Special Characters
     (Operators, operators_number,
-     Punctuators, punctuators_number,
-     SpecialChars, special_chars_number) = user.tokenizing_operators(cleaned_lines)
+     Punctuators, punctuators_number) = user.tokenizing_operators(cleaned_lines)
 
     # 2. Keywords, Identifiers
     (Keywords, keywords_number,
@@ -465,31 +439,136 @@ def CodeAnalyzer(source_code: str, file_name: str = "snippet.wpp"):
         sum(unrecognized_tokens_number.values())
     )
 
+    # ─── AGGREGATE ALL TOKENS FOR STATISTICS ───
+    all_tokens = []
+    
+    # 1. Keywords
+    for kw_type, lns in Keywords.items():
+        for ln in lns:
+            all_tokens.append({"value": kw_type, "type": kw_type, "category": "KEYWORD", "line": ln})
+            
+    # 2. Identifiers
+    for id_name, lns in identifiers.items():
+        for ln in lns:
+            all_tokens.append({"value": id_name, "type": "IDENTIFIER", "category": "IDENTIFIER", "line": ln})
+            
+    # 3. Operators
+    for op_type, lns in Operators.items():
+        for ln in lns:
+            all_tokens.append({"value": op_type, "type": op_type, "category": "OPERATOR", "line": ln})
+            
+    # 4. Punctuators (Separators)
+    for pun_type, lns in Punctuators.items():
+        for ln in lns:
+            all_tokens.append({"value": pun_type, "type": pun_type, "category": "SEPARATOR", "line": ln})
+            
+    # 5. Constants / Literals
+    for val, lns in literal_interger.items():
+        for ln in lns:
+            all_tokens.append({"value": val, "type": "LITERAL_INTEGER", "category": "LITERAL", "line": ln})
+    for val, lns in literal_float.items():
+        for ln in lns:
+            all_tokens.append({"value": val, "type": "LITERAL_FLOAT", "category": "LITERAL", "line": ln})
+    for val, lns in literal_words_dict.items():
+        for ln in lns:
+            all_tokens.append({"value": f'"{val}"', "type": "LITERAL_STRING", "category": "LITERAL", "line": ln})
+    for val, lns in literal_char.items():
+        for ln in lns:
+            all_tokens.append({"value": f"'{val}'", "type": "LITERAL_CHAR", "category": "LITERAL", "line": ln})
+            
+    # 6. Unrecognized
+    for val, lns in unrecognized_tokens.items():
+        for ln in lns:
+            all_tokens.append({"value": val, "type": "UNRECOGNIZED_TOKEN", "category": "UNRECOGNIZED", "line": ln})
+
+    # ─── CALCULATE SUMMARIES ───
+    line_counts = {}
+    for t in all_tokens:
+        line_counts[t["line"]] = line_counts.get(t["line"], 0) + 1
+    
+    line_wise_dist = [{"line": i, "count": line_counts.get(i, 0)} for i in range(1, total_tokens + 1)]
+
+    type_summary_map = {}
+    for t in all_tokens:
+        key = (t["category"], t["type"])
+        if key not in type_summary_map:
+            type_summary_map[key] = {"qty": 0, "lines": set()}
+        type_summary_map[key]["qty"] += 1
+        type_summary_map[key]["lines"].add(t["line"])
+    
+    token_type_summary = []
+    for (cat, t_type), info in type_summary_map.items():
+        token_type_summary.append({
+            "category": cat,
+            "type": t_type,
+            "qty": info["qty"],
+            "percentage": round((info["qty"] / total_token_count * 100), 2) if total_token_count > 0 else 0,
+            "lines": sorted(list(info["lines"]))
+        })
+    token_type_summary.sort(key=lambda x: (x["category"], x["type"]))
+
+    id_stats = [{"identifier": k, "frequency": len(v), "lines": sorted(list(set(v)))} for k, v in identifiers.items()]
+    id_stats.sort(key=lambda x: x["identifier"])
+
+    lit_stats = []
+    for val, lns in literal_interger.items(): lit_stats.append({"literal": val, "type": "INTEGER", "frequency": len(lns), "lines": sorted(list(set(lns)))})
+    for val, lns in literal_float.items(): lit_stats.append({"literal": val, "type": "FLOAT", "frequency": len(lns), "lines": sorted(list(set(lns)))})
+    for val, lns in literal_words_dict.items(): lit_stats.append({"literal": f'"{val}"', "type": "STRING", "frequency": len(lns), "lines": sorted(list(set(lns)))})
+    for val, lns in literal_char.items(): lit_stats.append({"literal": f"'{val}'", "type": "CHAR", "frequency": len(lns), "lines": sorted(list(set(lns)))})
+    lit_stats.sort(key=lambda x: (x["type"], x["literal"]))
+
+    most_frequent = "N/A"
+    least_frequent = "N/A"
+    if token_type_summary:
+        mf = max(token_type_summary, key=lambda x: x["qty"])
+        most_frequent = f"{mf['type']} ({mf['qty']} occurrences, {mf['percentage']}%)"
+        lf = min(token_type_summary, key=lambda x: x["qty"])
+        least_frequent = f"{lf['type']} ({lf['qty']} occurrences, {lf['percentage']}%)"
+
+    max_line_info = {"line": 0, "count": 0}
+    min_line_info = {"line": 0, "count": 0}
+    if line_counts:
+        max_ln = max(line_counts, key=line_counts.get)
+        max_line_info = {"line": max_ln, "count": line_counts[max_ln]}
+        min_ln = min(line_counts, key=line_counts.get)
+        min_line_info = {"line": min_ln, "count": line_counts[min_ln]}
+
+    # Category Breakdown
+    cat_counts = {}
+    for t in all_tokens: cat_counts[t["category"]] = cat_counts.get(t["category"], 0) + 1
+    
+    category_breakdown = []
+    for cat in ["KEYWORD", "IDENTIFIER", "LITERAL", "OPERATOR", "SEPARATOR", "COMMENT", "UNRECOGNIZED"]:
+        count = cat_counts.get(cat, 0)
+        if cat == "COMMENT": count = len(comments) + len(multi_line_comment)
+        category_breakdown.append({
+            "category": cat,
+            "total": count,
+            "percentage": round((count / total_token_count * 100), 2) if total_token_count > 0 else 0
+        })
+
     return {
         "file_name":        file_name,
         "total_lines":      total_tokens,
         "lines_with_code":  len(cleaned_lines),
         "empty_lines":      total_tokens - len(result),
         "total_tokens":     total_token_count,
-        "operators":        {"tokens": Operators,    "counts": operators_number},
-        "punctuators":      {"tokens": Punctuators,  "counts": punctuators_number},
-        "special_characters": {"tokens": SpecialChars, "counts": special_chars_number},
-        "keywords":         {"tokens": Keywords,     "counts": keywords_number},
-        "identifiers":      {"tokens": identifiers,  "counts": identifiers_number},
-        "constants": {
-            "integers": {"tokens": literal_interger, "counts": literal_interger_number},
-            "floats":   {"tokens": literal_float,    "counts": literal_float_number},
+        "token_type_summary": token_type_summary,
+        "line_distribution": line_wise_dist,
+        "identifier_statistics": id_stats,
+        "literal_statistics": lit_stats,
+        "category_breakdown": category_breakdown,
+        "overall_summary": {
+            "unique_token_types": len(token_type_summary),
+            "most_frequent_token": most_frequent,
+            "least_frequent_token": least_frequent,
+            "average_tokens_per_line": round(total_token_count / len(cleaned_lines), 2) if cleaned_lines else 0,
+            "max_tokens_line": max_line_info,
+            "min_tokens_line": min_line_info
         },
-        "literals": {
-            "strings": {"tokens": literal_words_dict, "counts": literal_words_number},
-            "chars":   {"tokens": literal_char,       "counts": literal_char_number},
-        },
-        "comments": {
-            "single_line": [{"text": c, "line": ln} for c, ln in comments],
-            "multi_line":  [{"text": c, "line": ln} for c, ln in multi_line_comment],
-        },
-        "unrecognized": {"tokens": unrecognized_tokens, "counts": unrecognized_tokens_number},
+        "allTokens": [{"value": t["value"], "category": t["category"], "line": t["line"]} for t in all_tokens]
     }
+
 
 
 def CodeAnalyzerFromFile(file_path: str):

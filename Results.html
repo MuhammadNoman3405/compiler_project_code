@@ -346,110 +346,184 @@ function renderReport(data) {
     if (!grid) return;
     grid.innerHTML = '';
   
-  // 1. Overview Section
-  const overview = createSection('Overall Statistics', `
-    <div class="summary-stats">
-      <div class="stat-item"><div class="stat-val">${data.total_tokens || 0}</div><div class="stat-lbl">Total Tokens</div></div>
-      <div class="stat-item"><div class="stat-val">${data.total_lines || 0}</div><div class="stat-lbl">Total Lines</div></div>
-      <div class="stat-item"><div class="stat-val">${data.lines_with_code || 0}</div><div class="stat-lbl">Code Lines</div></div>
-      <div class="stat-item"><div class="stat-val">${data.empty_lines || 0}</div><div class="stat-lbl">Empty Lines</div></div>
+    // 1. Token Type Summary Table (Requirement a)
+    if (data.token_type_summary) {
+      grid.appendChild(createSection('1. Token Type Summary', createTokenTypeSummaryTable(data.token_type_summary), true));
+    }
+
+    // 2. Line-wise Token Distribution (Requirement b)
+    if (data.line_distribution) {
+      grid.appendChild(createSection('2. Line-wise Token Distribution', createLineWiseTable(data.line_distribution), true));
+    }
+
+    // 3. Identifier Statistics (Requirement c)
+    if (data.identifier_statistics) {
+      grid.appendChild(createSection('3. Identifier Statistics', createIdentifierTable(data.identifier_statistics)));
+    }
+
+    // 4. Literal Statistics (Requirement d)
+    if (data.literal_statistics) {
+      grid.appendChild(createSection('4. Literal Statistics', createLiteralTable(data.literal_statistics)));
+    }
+
+    // 5. Token Summary Statistics (Requirement e / Overall Summary)
+    if (data.overall_summary) {
+      grid.appendChild(createSection('5. Token Summary Statistics', createDetailedSummary(data)));
+    }
+
+    // 6. Token Category Breakdown
+    if (data.category_breakdown) {
+      grid.appendChild(createSection('6. Token Category Breakdown', createCategoryBreakdown(data.category_breakdown)));
+    }
+
+    // 7. Unrecognized Tokens (New Section)
+    const unrecognized = data.token_type_summary?.filter(t => t.category === 'UNRECOGNIZED');
+    if (unrecognized && unrecognized.length > 0) {
+      grid.appendChild(createSection('Unrecognized Tokens', createUnrecognizedTable(unrecognized)));
+    }
+    
+    // 8. Token Stream (Visual)
+    if (data.allTokens && data.allTokens.length > 0) {
+      grid.appendChild(createSection('Token Stream (Visual)', createTokenStream(data.allTokens), true));
+    }
+  } catch (e) {
+    console.error('Error in renderReport:', e);
+    throw e;
+  }
+}
+
+function createTokenTypeSummaryTable(summary) {
+  let rows = summary.map(s => `
+    <tr>
+      <td><span class="pill" style="background:var(--${getColor(s.category)}); color:#000">${s.category}</span></td>
+      <td>${s.type}</td>
+      <td>${s.qty}</td>
+      <td>${s.percentage}%</td>
+      <td style="color:var(--muted); font-size: .7rem;">${s.lines.join(', ')}</td>
+    </tr>
+  `).join('');
+  return `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Category</th><th>Token Type</th><th>Qty</th><th>%</th><th>Lines</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
     </div>
-  `);
-  grid.appendChild(overview);
-
-  // 2. Token Categories
-  const categories = createCategoryTable(data);
-  grid.appendChild(createSection('Category Breakdown', categories));
-
-  // 3. Keywords
-  if (data.keywords && data.keywords.counts && Object.keys(data.keywords.counts).length > 0) {
-    grid.appendChild(createSection('Keywords Detected', createTable(data.keywords, 'Keyword', 'kw')));
-  }
-
-  // 4. Identifiers
-  if (data.identifiers && data.identifiers.counts && Object.keys(data.identifiers.counts).length > 0) {
-    grid.appendChild(createSection('Identifiers', createTable(data.identifiers, 'Identifier', 'id')));
-  }
-
-  // 5. Operators
-  if (data.operators && data.operators.counts && Object.keys(data.operators.counts).length > 0) {
-    grid.appendChild(createSection('Operators', createTable(data.operators, 'Operator', 'op')));
-  }
-
-  // 6. Punctuators
-  if (data.punctuators && data.punctuators.counts && Object.keys(data.punctuators.counts).length > 0) {
-    grid.appendChild(createSection('Punctuators', createTable(data.punctuators, 'Punctuator', 'pun')));
-  }
-
-  // 7. Constants
-  if (data.constants) {
-    const constData = {
-      counts: { ...(data.constants?.integers?.counts || {}), ...(data.constants?.floats?.counts || {}) },
-      tokens: { ...(data.constants?.integers?.tokens || {}), ...(data.constants?.floats?.tokens || {}) }
-    };
-    if (Object.keys(constData.counts).length > 0) {
-      grid.appendChild(createSection('Constants (Numeric)', createTable(constData, 'Constant', 'con')));
-    }
-  }
-
-  // 8. Literals
-  if (data.literals) {
-    const litData = {
-      counts: { ...(data.literals?.strings?.counts || {}), ...(data.literals?.chars?.counts || {}) },
-      tokens: { ...(data.literals?.strings?.tokens || {}), ...(data.literals?.chars?.tokens || {}) }
-    };
-    if (Object.keys(litData.counts).length > 0) {
-      grid.appendChild(createSection('Literals (Textual)', createTable(litData, 'Literal', 'lit')));
-    }
-  }
-
-  // 9. Special Characters
-  if (data.special_characters && data.special_characters.counts && Object.keys(data.special_characters.counts).length > 0) {
-    grid.appendChild(createSection('Special Characters', createTable(data.special_characters, 'Character', 'spec')));
-  }
-  
-  // 10. Token Stream
-  if (data.allTokens && data.allTokens.length > 0) {
-    grid.appendChild(createSection('Token Stream', createTokenStream(data.allTokens), true));
-  } else {
-    const stream = generateFallbackStream(data);
-    grid.appendChild(createSection('Token Stream', createTokenStream(stream), true));
-  }
-} catch (e) {
-  console.error('Error in renderReport:', e);
-  throw e;
-}
+  `;
 }
 
-function generateFallbackStream(data) {
-  const stream = [];
-  const add = (dict, cat, col) => {
-    if (!dict || !dict.tokens) return;
-    for (const [name, lines] of Object.entries(dict.tokens)) {
-      lines.forEach(l => stream.push({ value: name, category: cat, line: l, color: col }));
-    }
-  };
-  add(data.keywords, 'KEYWORD', 'kw');
-  add(data.identifiers, 'IDENTIFIER', 'id');
-  add(data.operators, 'OPERATOR', 'op');
-  add(data.punctuators, 'PUNCTUATOR', 'pun');
-  add(data.special_characters, 'SPECIAL', 'spec');
-  
-  if (data.constants) {
-    add(data.constants.integers, 'CONSTANT', 'con');
-    add(data.constants.floats, 'CONSTANT', 'con');
-  }
-  if (data.literals) {
-    add(data.literals.strings, 'LITERAL', 'lit');
-    add(data.literals.chars, 'LITERAL', 'lit');
-  }
-  
-  return stream.sort((a,b) => a.line - b.line);
+function createLineWiseTable(dist) {
+  let rows = dist.map(d => `
+    <tr>
+      <td>Line ${d.line}</td>
+      <td><strong>${d.count}</strong> tokens</td>
+    </tr>
+  `).join('');
+  return `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Line Number</th><th>Total Tokens</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function createIdentifierTable(stats) {
+  let rows = stats.map(s => `
+    <tr>
+      <td style="color:var(--id)">${s.identifier}</td>
+      <td>${s.frequency}</td>
+      <td style="color:var(--muted); font-size: .7rem;">${s.lines.join(', ')}</td>
+    </tr>
+  `).join('');
+  return `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Identifier</th><th>Frequency</th><th>Lines</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function createLiteralTable(stats) {
+  let rows = stats.map(s => `
+    <tr>
+      <td style="color:var(--lit)">${s.literal}</td>
+      <td><small>${s.type}</small></td>
+      <td>${s.frequency}</td>
+      <td style="color:var(--muted); font-size: .7rem;">${s.lines.join(', ')}</td>
+    </tr>
+  `).join('');
+  return `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Literal</th><th>Type</th><th>Frequency</th><th>Lines</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function createUnrecognizedTable(unrecognized) {
+  let rows = unrecognized.map(u => `
+    <tr>
+      <td style="color:var(--red)">${u.type}</td>
+      <td>${u.qty}</td>
+      <td style="color:var(--muted); font-size: .7rem;">${u.lines.join(', ')}</td>
+    </tr>
+  `).join('');
+  return `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Token</th><th>Qty</th><th>Lines</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function createDetailedSummary(data) {
+  const s = data.overall_summary;
+  return `
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: .85rem; line-height: 1.8;">
+      <p>Total Tokens: <span style="color:var(--accent)">${data.total_tokens}</span></p>
+      <p>Unique Token Types: <span style="color:var(--accent)">${s.unique_token_types}</span></p>
+      <p>Total number of lines with code (excluding empty lines): <span style="color:var(--accent)">${data.lines_with_code}</span></p>
+      <p>Empty/Ignored Lines: <span style="color:var(--accent)">${data.empty_lines}</span></p>
+      <br>
+      <p>Most Frequent Token: <span style="color:var(--green)">${s.most_frequent_token}</span></p>
+      <p>Least Frequent Token: <span style="color:var(--red)">${s.least_frequent_token}</span></p>
+      <br>
+      <p>Average Tokens per Line: <span style="color:var(--yellow)">${s.average_tokens_per_line}</span></p>
+      <p>Maximum Tokens in a Single Line: <span style="color:var(--accent)">${s.max_tokens_line.count} (Line ${s.max_tokens_line.line})</span></p>
+      <p>Minimum Tokens in a Single Line: <span style="color:var(--accent)">${s.min_tokens_line.count} (Line ${s.min_tokens_line.line})</span></p>
+    </div>
+  `;
+}
+
+function createCategoryBreakdown(breakdown) {
+  let rows = breakdown.map(c => `
+    <tr>
+      <td><span class="pill" style="background:var(--${getColor(c.category)}); color:#000">${c.category}</span></td>
+      <td><strong>${c.total}</strong></td>
+      <td>${c.percentage}%</td>
+    </tr>
+  `).join('');
+  return `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Category</th><th>Total</th><th>Percentage</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
 }
 
 function createTokenStream(tokens) {
   let chips = tokens.map(t => `
-    <span class="token-chip" style="border-left: 3px solid var(--${t.color || getColor(t.category)})" title="Line ${t.line}">
+    <span class="token-chip" style="border-left: 3px solid var(--${getColor(t.category)})" title="Line ${t.line}">
       ${t.value}
     </span>
   `).join('');
@@ -461,12 +535,13 @@ function getColor(cat) {
     KEYWORD: 'kw', 
     IDENTIFIER: 'id', 
     OPERATOR: 'op', 
-    PUNCTUATOR: 'pun', 
-    CONSTANT: 'con', 
+    SEPARATOR: 'pun', 
     LITERAL: 'lit', 
-    SPECIAL: 'spec' 
+    COMMENT: 'green',
+    UNRECOGNIZED: 'red'
   }[cat] || 'muted';
 }
+
 
 function createSection(title, content, fullWidth = false) {
   const card = document.createElement('div');
@@ -484,69 +559,11 @@ function createSection(title, content, fullWidth = false) {
   return card;
 }
 
-function createTable(dict, label, colorVar) {
-  let rows = '';
-  for (const [name, count] of Object.entries(dict.counts)) {
-    const lines = dict.tokens[name].join(', ');
-    rows += `
-      <tr>
-        <td style="color:var(--${colorVar})">${name}</td>
-        <td>${count}</td>
-        <td style="color:var(--muted); font-size: .7rem;">${lines}</td>
-      </tr>
-    `;
-  }
-  return `
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>${label}</th><th>Qty</th><th>Lines</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-  `;
-}
-
-function createCategoryTable(data) {
-  const sumConst = data.constants ? (sum(data.constants.integers?.counts) + sum(data.constants.floats?.counts)) : 0;
-  const sumLit = data.literals ? (sum(data.literals.strings?.counts) + sum(data.literals.chars?.counts)) : 0;
-  
-  const cats = [
-    { name: 'Keywords', val: sum(data.keywords?.counts), col: 'kw' },
-    { name: 'Identifiers', val: sum(data.identifiers?.counts), col: 'id' },
-    { name: 'Operators', val: sum(data.operators?.counts), col: 'op' },
-    { name: 'Punctuators', val: sum(data.punctuators?.counts), col: 'pun' },
-    { name: 'Constants', val: sumConst, col: 'con' },
-    { name: 'Literals', val: sumLit, col: 'lit' },
-    { name: 'Special Chars', val: sum(data.special_characters?.counts), col: 'spec' }
-  ];
-  
-  let rows = cats.map(c => `
-    <tr>
-      <td><span class="pill" style="background:var(--${c.col}); color:#000">${c.name}</span></td>
-      <td><strong>${c.val}</strong></td>
-      <td>${data.total_tokens > 0 ? ((c.val / data.total_tokens) * 100).toFixed(1) : 0}%</td>
-    </tr>
-  `).join('');
-  
-  return `<div class="table-wrap"><table><thead><tr><th>Category</th><th>Count</th><th>%</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-}
-
-function createLiteralTable(literals) {
-  let rows = '';
-  const types = ['strings', 'integers', 'floats', 'chars'];
-  types.forEach(type => {
-    for (const [val, count] of Object.entries(literals[type].counts)) {
-      rows += `<tr><td>${val}</td><td><small>${type.toUpperCase()}</small></td><td>${count}</td></tr>`;
-    }
-  });
-  if (!rows) return null;
-  return `<div class="table-wrap"><table><thead><tr><th>Value</th><th>Type</th><th>Qty</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-}
-
 function sum(obj) { 
   if (!obj) return 0;
   return Object.values(obj).reduce((a, b) => a + b, 0); 
 }
+
 function sumLiterals(l) {
   if (!l) return 0;
   return sum(l.strings?.counts) + sum(l.integers?.counts) + sum(l.floats?.counts) + sum(l.chars?.counts);

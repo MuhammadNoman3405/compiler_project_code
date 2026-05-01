@@ -356,7 +356,6 @@ class User:
                                comments, multi_line_comment,
                                Operators, operators_number,
                                Punctuators, punctuators_number,
-                               SpecialChars, special_chars_number,
                                Keywords, keywords_number,
                                unrecognized_tokens, unrecognized_tokens_number,
                                identifiers, identifiers_number,
@@ -368,7 +367,6 @@ class User:
         Total_tokens = (
             sum(operators_number.values()) +
             sum(punctuators_number.values()) +
-            sum(special_chars_number.values()) +
             sum(keywords_number.values()) +
             sum(identifiers_number.values()) +
             sum(literal_interger_number.values()) +
@@ -397,7 +395,6 @@ class User:
         print(f'  Constants Flt : {sum(literal_float_number.values())}')
         print(f'  Literals Str  : {sum(literal_words_number.values())}')
         print(f'  Literals Char : {sum(literal_char_number.values())}')
-        print(f'  Special Chars : {sum(special_chars_number.values())}')
         print(f'  Unrecognized  : {sum(unrecognized_tokens_number.values())}')
         print('=' * 60)
 
@@ -429,7 +426,6 @@ def CodeAnalyzer(source_code: str, file_name: str = "snippet.wpp"):
     total_token_count = (
         sum(operators_number.values()) +
         sum(punctuators_number.values()) +
-        sum(special_chars_number.values()) +
         sum(keywords_number.values()) +
         sum(identifiers_number.values()) +
         sum(literal_interger_number.values()) +
@@ -589,8 +585,7 @@ if __name__ == "__main__":
     comments, multi_line_comment, cleaned_lines = user.line_tokenizer(result)
 
     (Operators, operators_number,
-     Punctuators, punctuators_number,
-     SpecialChars, special_chars_number) = user.tokenizing_operators(cleaned_lines)
+     Punctuators, punctuators_number) = user.tokenizing_operators(cleaned_lines)
 
     (Keywords, keywords_number,
      unrecognized_tokens, unrecognized_tokens_number,
@@ -607,7 +602,6 @@ if __name__ == "__main__":
         comments, multi_line_comment,
         Operators, operators_number,
         Punctuators, punctuators_number,
-        SpecialChars, special_chars_number,
         Keywords, keywords_number,
         unrecognized_tokens, unrecognized_tokens_number,
         identifiers, identifiers_number,
